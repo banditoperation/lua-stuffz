@@ -5373,17 +5373,17 @@ function MacLib:Window(Settings)
 		return baseUIScale.Scale
 	end
 
-local ClassParser = {
+	local ClassParser = {
 		["Toggle"] = {
 			Save = function(Flag, data)
 				return {
 					type = "Toggle", 
 					flag = Flag, 
-					state = data:GetState()
+					state = data.State or false
 				}
 			end,
 			Load = function(Flag, data)
-				if MacLib.Options[Flag] and data.state ~= nil then
+				if MacLib.Options[Flag] and data.state then
 					MacLib.Options[Flag]:UpdateState(data.state)
 				end
 			end
@@ -5393,7 +5393,7 @@ local ClassParser = {
 				return {
 					type = "Slider", 
 					flag = Flag, 
-					value = data:GetValue()
+					value = (data.Value and tostring(data.Value)) or false
 				}
 			end,
 			Load = function(Flag, data)
@@ -5407,37 +5407,33 @@ local ClassParser = {
 				return {
 					type = "Input", 
 					flag = Flag, 
-					text = data:GetInput()
+					text = data.Text
 				}
 			end,
 			Load = function(Flag, data)
-				if MacLib.Options[Flag] and data.text then
+				if MacLib.Options[Flag] and data.text and type(data.text) == "string" then
 					MacLib.Options[Flag]:UpdateText(data.text)
 				end
 			end
 		},
 		["Keybind"] = {
 			Save = function(Flag, data)
-				local bind = data:GetBind()
 				return {
 					type = "Keybind", 
 					flag = Flag, 
-					bind = (bind and bind.Name) or nil
+					bind = data.NIGGERFIXTHEBIND.Name
 				}
 			end,
 			Load = function(Flag, data)
+				for i,v in next, data do
+				end
 				if MacLib.Options[Flag] and data.bind then
-					-- Logic from the 'fixed' file to handle Mouse Buttons vs Keyboard
-					local success, key = pcall(function() return Enum.KeyCode[data.bind] end)
+					local isValidKeyCode, isKeyCode = pcall(function() return Enum.KeyCode[bind] end)
 					
-					if success and key then
-						MacLib.Options[Flag]:Bind(key)
+					if isValidKeyCode and isKeyCode then
+						MacLib.Options[Flag]:Bind(Enum.KeyCode[data.bind])
 					else
-						-- Fallback for UserInputType (Mouse buttons)
-						local successMouse, mouse = pcall(function() return Enum.UserInputType[data.bind] end)
-						if successMouse and mouse then
-							MacLib.Options[Flag]:Bind(mouse)
-						end
+						MacLib.Options[Flag]:Bind(Enum.UserInputType[data.bind])
 					end
 				end
 			end
@@ -5471,7 +5467,6 @@ local ClassParser = {
 			end,
 			Load = function(Flag, data)
 				local function HexToColor3(hex)
-					if not hex then return Color3.new(1,1,1) end
 					local r = tonumber(hex:sub(2, 3), 16) / 255
 					local g = tonumber(hex:sub(4, 5), 16) / 255
 					local b = tonumber(hex:sub(6, 7), 16) / 255
@@ -5487,9 +5482,8 @@ local ClassParser = {
 			end
 		}
 	}
-
+	
 	local function BuildFolderTree()
-		if isStudio then return end
 		local paths = {
 			MacLib.Folder,
 			MacLib.Folder .. "/settings"
@@ -5502,24 +5496,13 @@ local ClassParser = {
 			end
 		end
 	end
-
-	function MacLib:LoadAutoLoadConfig()
-		if isStudio then return end
-		if isfile(MacLib.Folder .. "/settings/autoload.txt") then
-			local name = readfile(MacLib.Folder .. "/settings/autoload.txt")
-			MacLib:LoadConfig(name)
-		end
-	end
-
+	
 	function MacLib:SetFolder(Folder)
-		if isStudio then return end
 		MacLib.Folder = Folder;
 		BuildFolderTree()
 	end
-
+	
 	function MacLib:SaveConfig(Path)
-		if isStudio then return false, "Cannot save in Studio" end
-		
 		if (not Path) then
 			return false, "Please select a config file."
 		end
@@ -5533,7 +5516,6 @@ local ClassParser = {
 		for flag, option in next, MacLib.Options do
 			if not ClassParser[option.Class] then continue end
 			if option.IgnoreConfig then continue end
-
 			table.insert(data.objects, ClassParser[option.Class].Save(flag, option))
 		end	
 
@@ -5545,10 +5527,8 @@ local ClassParser = {
 		writefile(fullPath, encoded)
 		return true
 	end
-
+	
 	function MacLib:LoadConfig(Path)
-		if isStudio then return false, "Cannot load in Studio" end
-		
 		if (not Path) then
 			return false, "Please select a config file."
 		end
@@ -5569,11 +5549,8 @@ local ClassParser = {
 
 		return true
 	end
-
+	
 	function MacLib:RefreshConfigList()
-		if isStudio then return {} end
-		
-		if not isfolder(MacLib.Folder .. "/settings") then return {} end
 		local list = listfiles(MacLib.Folder .. "/settings")
 
 		local out = {}
@@ -5602,12 +5579,12 @@ local ClassParser = {
 	end
 
 	macLib.Enabled = false
-
+	
 	local assetList = {}
 	for _, assetId in pairs(assets) do
 		table.insert(assetList, assetId)
 	end
-
+	
 	ContentProvider:PreloadAsync(assetList)
 	macLib.Enabled = true
 	windowState = true
@@ -5879,3 +5856,4 @@ function MacLib:Demo()
 end
 
 return MacLib
+
