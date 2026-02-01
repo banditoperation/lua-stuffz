@@ -1,4 +1,4 @@
--- updated 2
+-- updated :3
 
 local MacLib = { 
 	Options = {}, 
@@ -2269,7 +2269,7 @@ function MacLib:Window(Settings)
 					return InputFunctions
 				end
 
-function SectionFunctions:Keybind(Settings, Flag)
+				function SectionFunctions:Keybind(Settings, Flag)
 					local KeybindFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Keybind" }
 					local keybind = Instance.new("Frame")
 					keybind.Name = "Keybind"
@@ -2349,7 +2349,6 @@ function SectionFunctions:Keybind(Settings, Flag)
 					local isBinding = false
 					local reset = false
 					local binded = KeybindFunctions.Settings.Default
-                    KeybindFunctions.Bind = binded -- [FIX 1] Initialize the Bind variable for config saving
 
 					local function resetFocusState()
 						focused = false
@@ -2389,8 +2388,6 @@ function SectionFunctions:Keybind(Settings, Flag)
 									binded = input.UserInputType
 									binderBox.Text = input.UserInputType.Name
 								end
-                                
-                                KeybindFunctions.Bind = binded -- [FIX 2] Update variable when user binds manually
 
 								if KeybindFunctions.Settings.onBinded then
 									KeybindFunctions.Settings.onBinded(binded)
@@ -2425,18 +2422,17 @@ function SectionFunctions:Keybind(Settings, Flag)
 
 					function KeybindFunctions:Bind(Key)
 						binded = Key
-                        KeybindFunctions.Bind = binded -- [FIX 3] Update variable when loading config
 						binderBox.Text = Key.Name
-                        
-                        -- [FIX 4] Trigger the 'onBinded' event so the script knows the key changed
-                        if KeybindFunctions.Settings.onBinded then
-                            KeybindFunctions.Settings.onBinded(binded)
-                        end
+
+
+						-- Restoration of Old MacLib functionality:
+						if KeybindFunctions.Settings.onBinded then
+							KeybindFunctions.Settings.onBinded(binded)
 					end
+				end
 
 					function KeybindFunctions:Unbind()
 						binded = nil
-                        KeybindFunctions.Bind = nil
 						binderBox.Text = ""
 					end
 
@@ -5426,22 +5422,18 @@ function SectionFunctions:Keybind(Settings, Flag)
 				end
 			end
 		},
-["Keybind"] = {
+		["Keybind"] = {
 			Save = function(Flag, data)
+				local key = data:GetBind()
 				return {
 					type = "Keybind", 
 					flag = Flag, 
-					bind = (typeof(data.Bind) == "EnumItem" and data.Bind.Name) or nil
+					bind = (key and key.Name) or nil
 				}
 			end,
 			Load = function(Flag, data)
 				if MacLib.Options[Flag] and data.bind then
-                    -- [FIX 5] Robust check for both Keyboard keys and Mouse buttons
-					local success, key = pcall(function() return Enum.KeyCode[data.bind] end)
-					if not success or not key then
-						pcall(function() key = Enum.UserInputType[data.bind] end)
-					end
-					
+					local key = Enum.KeyCode[data.bind] or Enum.UserInputType[data.bind]
 					if key then
 						MacLib.Options[Flag]:Bind(key)
 					end
