@@ -1,4 +1,4 @@
--- updated :3
+-- updated :O
 
 local MacLib = { 
 	Options = {}, 
@@ -5422,7 +5422,7 @@ function MacLib:Window(Settings)
 				end
 			end
 		},
-		["Keybind"] = {
+        ["Keybind"] = {
 			Save = function(Flag, data)
 				local key = data:GetBind()
 				return {
@@ -5433,9 +5433,23 @@ function MacLib:Window(Settings)
 			end,
 			Load = function(Flag, data)
 				if MacLib.Options[Flag] and data.bind then
-					local key = Enum.KeyCode[data.bind] or Enum.UserInputType[data.bind]
-					if key then
-						MacLib.Options[Flag]:Bind(key)
+					-- Safely try to check if it's a KeyCode (Keyboard)
+					local success, result = pcall(function()
+						return Enum.KeyCode[data.bind] 
+					end)
+
+					if success and result then
+						-- It was a keyboard key, bind it
+						MacLib.Options[Flag]:Bind(result)
+					else
+						-- It wasn't a keyboard key (errored), so try UserInputType (Mouse)
+						local successMouse, resultMouse = pcall(function()
+							return Enum.UserInputType[data.bind]
+						end)
+						
+						if successMouse and resultMouse then
+							MacLib.Options[Flag]:Bind(resultMouse)
+						end
 					end
 				end
 			end
