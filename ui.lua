@@ -1,3 +1,5 @@
+-- updated
+
 local MacLib = { 
 	Options = {}, 
 	Folder = "Maclib", 
@@ -5371,14 +5373,13 @@ function MacLib:Window(Settings)
 		return baseUIScale.Scale
 	end
 
---// Fixed Configuration System
-	local ClassParser = {
+local ClassParser = {
 		["Toggle"] = {
 			Save = function(Flag, data)
 				return {
 					type = "Toggle", 
 					flag = Flag, 
-					state = data:GetState() -- Changed to use Getter
+					state = data:GetState()
 				}
 			end,
 			Load = function(Flag, data)
@@ -5392,7 +5393,7 @@ function MacLib:Window(Settings)
 				return {
 					type = "Slider", 
 					flag = Flag, 
-					value = data:GetValue() -- Changed to use Getter
+					value = data:GetValue()
 				}
 			end,
 			Load = function(Flag, data)
@@ -5406,7 +5407,7 @@ function MacLib:Window(Settings)
 				return {
 					type = "Input", 
 					flag = Flag, 
-					text = data:GetInput() -- Changed to use Getter
+					text = data:GetInput()
 				}
 			end,
 			Load = function(Flag, data)
@@ -5417,34 +5418,26 @@ function MacLib:Window(Settings)
 		},
 		["Keybind"] = {
 			Save = function(Flag, data)
-				local bind = data:GetBind() -- Changed to use Getter
-				if not bind then 
-					return { type = "Keybind", flag = Flag, bind = nil } 
-				end
-				
-				-- Save the type (Key vs Mouse) to prevent errors on load
-				local bindType = (bind.EnumType == Enum.KeyCode and "Key") or "Mouse"
-				
+				local bind = data:GetBind()
 				return {
 					type = "Keybind", 
 					flag = Flag, 
-					bind = bind.Name,
-					bindType = bindType
+					bind = (bind and bind.Name) or nil
 				}
 			end,
 			Load = function(Flag, data)
 				if MacLib.Options[Flag] and data.bind then
-					local bindEnum
+					-- Logic from the 'fixed' file to handle Mouse Buttons vs Keyboard
+					local success, key = pcall(function() return Enum.KeyCode[data.bind] end)
 					
-					-- Handle Mouse inputs vs Keyboard inputs
-					if data.bindType == "Mouse" then
-						bindEnum = Enum.UserInputType[data.bind]
+					if success and key then
+						MacLib.Options[Flag]:Bind(key)
 					else
-						bindEnum = Enum.KeyCode[data.bind]
-					end
-					
-					if bindEnum then
-						MacLib.Options[Flag]:Bind(bindEnum)
+						-- Fallback for UserInputType (Mouse buttons)
+						local successMouse, mouse = pcall(function() return Enum.UserInputType[data.bind] end)
+						if successMouse and mouse then
+							MacLib.Options[Flag]:Bind(mouse)
+						end
 					end
 				end
 			end
@@ -5454,7 +5447,7 @@ function MacLib:Window(Settings)
 				return {
 					type = "Dropdown", 
 					flag = Flag, 
-					value = data.Value -- Dropdown .Value is reliable in this lib
+					value = data.Value
 				}
 			end,
 			Load = function(Flag, data)
@@ -5472,18 +5465,17 @@ function MacLib:Window(Settings)
 				return {
 					type = "Colorpicker", 
 					flag = Flag, 
-					color = Color3ToHex(data.Color),
+					color = Color3ToHex(data.Color) or nil,
 					alpha = data.Alpha
 				}
 			end,
 			Load = function(Flag, data)
 				local function HexToColor3(hex)
 					if not hex then return Color3.new(1,1,1) end
-					hex = hex:gsub("#","")
-					local r = tonumber(hex:sub(1, 2), 16) or 255
-					local g = tonumber(hex:sub(3, 4), 16) or 255
-					local b = tonumber(hex:sub(5, 6), 16) or 255
-					return Color3.fromRGB(r, g, b)
+					local r = tonumber(hex:sub(2, 3), 16) / 255
+					local g = tonumber(hex:sub(4, 5), 16) / 255
+					local b = tonumber(hex:sub(6, 7), 16) / 255
+					return Color3.new(r, g, b)
 				end
 
 				if MacLib.Options[Flag] and data.color then
@@ -5497,9 +5489,7 @@ function MacLib:Window(Settings)
 	}
 
 	local function BuildFolderTree()
-		if isStudio then return end -- Prevent studio errors
-		if not makefolder or not isfolder then return end
-
+		if isStudio then return end
 		local paths = {
 			MacLib.Folder,
 			MacLib.Folder .. "/settings"
@@ -5515,64 +5505,41 @@ function MacLib:Window(Settings)
 
 	function MacLib:LoadAutoLoadConfig()
 		if isStudio then return end
-		if not isfile or not readfile then return end
-
 		if isfile(MacLib.Folder .. "/settings/autoload.txt") then
 			local name = readfile(MacLib.Folder .. "/settings/autoload.txt")
-			-- Validate the file exists before trying to load it
-			if isfile(MacLib.Folder .. "/settings/" .. name .. ".json") then
-				local suc, err = MacLib:LoadConfig(name)
-				if not suc then
-					warn("MacLib AutoLoad Error:", err)
-				else
-					WindowFunctions:Notify({
-						Title = "Interface",
-						Description = string.format("Auto-loaded config: %q", name),
-						Lifetime = 5
-					})
-				end
-			end
+			MacLib:LoadConfig(name)
 		end
 	end
 
 	function MacLib:SetFolder(Folder)
-		if isStudio then 
-			warn("MacLib: Config system is disabled in Studio")
-			return 
-		end
-		
+		if isStudio then return end
 		MacLib.Folder = Folder;
 		BuildFolderTree()
 	end
 
 	function MacLib:SaveConfig(Path)
 		if isStudio then return false, "Cannot save in Studio" end
-		if not writefile then return false, "Executor does not support writefile" end
-
-		if (not Path) or (Path == "") then
-			return false, "Invalid config name"
+		
+		if (not Path) then
+			return false, "Please select a config file."
 		end
 
 		local fullPath = MacLib.Folder .. "/settings/" .. Path .. ".json"
-		local data = { objects = {} }
+
+		local data = {
+			objects = {}
+		}
 
 		for flag, option in next, MacLib.Options do
-			if option.Class and ClassParser[option.Class] and not option.IgnoreConfig then
-				local success, result = pcall(function()
-					return ClassParser[option.Class].Save(flag, option)
-				end)
-				
-				if success and result then
-					table.insert(data.objects, result)
-				else
-					warn("MacLib: Failed to save option " .. tostring(flag))
-				end
-			end
+			if not ClassParser[option.Class] then continue end
+			if option.IgnoreConfig then continue end
+
+			table.insert(data.objects, ClassParser[option.Class].Save(flag, option))
 		end	
 
 		local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
 		if not success then
-			return false, "Unable to encode JSON"
+			return false, "Unable to encode into JSON data"
 		end
 
 		writefile(fullPath, encoded)
@@ -5581,21 +5548,19 @@ function MacLib:Window(Settings)
 
 	function MacLib:LoadConfig(Path)
 		if isStudio then return false, "Cannot load in Studio" end
-		if not readfile or not isfile then return false, "Executor missing file functions" end
-
-		if (not Path) or (Path == "") then
-			return false, "Invalid config name"
+		
+		if (not Path) then
+			return false, "Please select a config file."
 		end
 
 		local file = MacLib.Folder .. "/settings/" .. Path .. ".json"
-		if not isfile(file) then return false, "File does not exist" end
+		if not isfile(file) then return false, "Invalid file" end
 
 		local success, decoded = pcall(HttpService.JSONDecode, HttpService, readfile(file))
-		if not success then return false, "Unable to decode JSON" end
+		if not success then return false, "Unable to decode JSON data." end
 
 		for _, option in next, decoded.objects do
 			if ClassParser[option.type] then
-				-- Use task.spawn to prevent one failing option from breaking the whole load
 				task.spawn(function() 
 					ClassParser[option.type].Load(option.flag, option) 
 				end)
@@ -5607,20 +5572,29 @@ function MacLib:Window(Settings)
 
 	function MacLib:RefreshConfigList()
 		if isStudio then return {} end
-		if not listfiles or not isfolder then return {} end
 		
-		-- Ensure folder exists before listing
 		if not isfolder(MacLib.Folder .. "/settings") then return {} end
-
 		local list = listfiles(MacLib.Folder .. "/settings")
-		local out = {}
 
+		local out = {}
 		for i = 1, #list do
 			local file = list[i]
-			-- Cleaner path parsing
-			local fileName = file:match("([^/\\]+)%.json$")
-			if fileName and fileName ~= "options" then
-				table.insert(out, fileName)
+			if file:sub(-5) == ".json" then
+				local pos = file:find(".json", 1, true)
+				local start = pos
+
+				local char = file:sub(pos, pos)
+				while char ~= "/" and char ~= "\\" and char ~= "" do
+					pos = pos - 1
+					char = file:sub(pos, pos)
+				end
+
+				if char == "/" or char == "\\" then
+					local name = file:sub(pos + 1, start - 1)
+					if name ~= "options" then
+						table.insert(out, name)
+					end
+				end
 			end
 		end
 
