@@ -1793,7 +1793,6 @@ function MacLib:Window(Settings)
 						}):Play()
 
 						ToggleFunctions.State = State
-						ToggleFunctions.Value = State
 						if callback then
 							callback(togglebool)
 						end
@@ -2080,7 +2079,7 @@ function MacLib:Window(Settings)
 						slider.Visible = State
 					end
 					function SliderFunctions:UpdateValue(Value)
-						SetValue(tonumber(Value), true)
+						SetValue(tonumber(Value), false) -- Changed to false (Don't ignore callback)
 					end
 					function SliderFunctions:GetValue()
 						return finalValue
@@ -2237,7 +2236,6 @@ function MacLib:Window(Settings)
 							InputFunctions.Settings.onChanged(InputBox.Text)
 						end
 						InputFunctions.Text = InputBox.Text
-						InputFunctions.Value = InputBox.Text
 					end)
 
 					function InputFunctions:UpdateName(Name)
@@ -2256,7 +2254,6 @@ function MacLib:Window(Settings)
 						local filteredText = AcceptedCharacters(Text)
 						InputBox.Text = filteredText
 						InputFunctions.Text = filteredText
-						InputFunctions.Value = filteredText
 						task.spawn(function()
 							if InputFunctions.Settings.Callback then
 								InputFunctions.Settings.Callback(filteredText)
@@ -2270,7 +2267,7 @@ function MacLib:Window(Settings)
 					return InputFunctions
 				end
 
-function SectionFunctions:Keybind(Settings, Flag)
+				function SectionFunctions:Keybind(Settings, Flag)
 					local KeybindFunctions = { Settings = Settings, IgnoreConfig = false, Class = "Keybind" }
 					local keybind = Instance.new("Frame")
 					keybind.Name = "Keybind"
@@ -2350,9 +2347,6 @@ function SectionFunctions:Keybind(Settings, Flag)
 					local isBinding = false
 					local reset = false
 					local binded = KeybindFunctions.Settings.Default
-					
-					-- Initialize Value for Config Saving
-					KeybindFunctions.Value = binded
 
 					local function resetFocusState()
 						focused = false
@@ -2392,9 +2386,6 @@ function SectionFunctions:Keybind(Settings, Flag)
 									binded = input.UserInputType
 									binderBox.Text = input.UserInputType.Name
 								end
-								
-								-- FIX: Update the exported value so the config system can see it
-								KeybindFunctions.Value = binded
 
 								if KeybindFunctions.Settings.onBinded then
 									KeybindFunctions.Settings.onBinded(binded)
@@ -2429,13 +2420,16 @@ function SectionFunctions:Keybind(Settings, Flag)
 
 					function KeybindFunctions:Bind(Key)
 						binded = Key
-						KeybindFunctions.Value = binded -- Fix for config loading
 						binderBox.Text = Key.Name
+
+
+						-- Restoration of Old MacLib functionality:
+						if KeybindFunctions.Settings.onBinded then
+							KeybindFunctions.Settings.onBinded(binded)
 					end
 
 					function KeybindFunctions:Unbind()
 						binded = nil
-						KeybindFunctions.Value = nil
 						binderBox.Text = ""
 					end
 
@@ -5382,17 +5376,17 @@ function SectionFunctions:Keybind(Settings, Flag)
 		return baseUIScale.Scale
 	end
 
-local ClassParser = {
+	local ClassParser = {
 		["Toggle"] = {
 			Save = function(Flag, data)
 				return {
 					type = "Toggle", 
 					flag = Flag, 
-					state = data.Value -- Changed to match the fixed Toggle function
+					state = data.State or false
 				}
 			end,
 			Load = function(Flag, data)
-				if MacLib.Options[Flag] and data.state ~= nil then
+				if MacLib.Options[Flag] and data.state then
 					MacLib.Options[Flag]:UpdateState(data.state)
 				end
 			end
@@ -5416,7 +5410,7 @@ local ClassParser = {
 				return {
 					type = "Input", 
 					flag = Flag, 
-					text = data.Value -- Changed to .Value to match standard
+					text = data.Text
 				}
 			end,
 			Load = function(Flag, data)
@@ -5427,30 +5421,15 @@ local ClassParser = {
 		},
 		["Keybind"] = {
 			Save = function(Flag, data)
-				-- Fixed: Actually gets the value from the element
-				local bindName = nil
-				if data.Value then
-					bindName = data.Value.Name
-				end
-				
 				return {
 					type = "Keybind", 
 					flag = Flag, 
-					bind = bindName
+					bind = (typeof(data.Bind) == "EnumItem" and data.Bind.Name) or nil
 				}
 			end,
 			Load = function(Flag, data)
 				if MacLib.Options[Flag] and data.bind then
-					-- Fixed: Logic from Old Maclib to handle MouseButtons vs Keyboard keys
-					local success, result = pcall(function() return Enum.KeyCode[data.bind] end)
-					if success and result then
-						MacLib.Options[Flag]:Bind(result)
-					else
-						local success2, result2 = pcall(function() return Enum.UserInputType[data.bind] end)
-						if success2 and result2 then
-							MacLib.Options[Flag]:Bind(result2)
-						end
-					end
+					MacLib.Options[Flag]:Bind(Enum.KeyCode[data.bind])
 				end
 			end
 		},
