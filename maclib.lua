@@ -1,3 +1,5 @@
+-- updated
+
 local MacLib = { 
 	Options = {}, 
 	Folder = "Maclib", 
@@ -2427,6 +2429,7 @@ function MacLib:Window(Settings)
 						if KeybindFunctions.Settings.onBinded then
 							KeybindFunctions.Settings.onBinded(binded)
 					end
+				end
 
 					function KeybindFunctions:Unbind()
 						binded = nil
