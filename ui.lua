@@ -1,5 +1,3 @@
--- updated
-
 local MacLib = { 
 	Options = {}, 
 	Folder = "Maclib", 
@@ -5421,20 +5419,12 @@ function MacLib:Window(Settings)
 				return {
 					type = "Keybind", 
 					flag = Flag, 
-					bind = data.NIGGERFIXTHEBIND.Name
+					bind = (typeof(data.Bind) == "EnumItem" and data.Bind.Name) or nil
 				}
 			end,
 			Load = function(Flag, data)
-				for i,v in next, data do
-				end
 				if MacLib.Options[Flag] and data.bind then
-					local isValidKeyCode, isKeyCode = pcall(function() return Enum.KeyCode[bind] end)
-					
-					if isValidKeyCode and isKeyCode then
-						MacLib.Options[Flag]:Bind(Enum.KeyCode[data.bind])
-					else
-						MacLib.Options[Flag]:Bind(Enum.UserInputType[data.bind])
-					end
+					MacLib.Options[Flag]:Bind(Enum.KeyCode[data.bind])
 				end
 			end
 		},
@@ -5482,8 +5472,10 @@ function MacLib:Window(Settings)
 			end
 		}
 	}
-	
+
 	local function BuildFolderTree()
+		if isStudio or not (isfolder and makefolder) then return "Config system unavailable." end
+
 		local paths = {
 			MacLib.Folder,
 			MacLib.Folder .. "/settings"
@@ -5496,13 +5488,38 @@ function MacLib:Window(Settings)
 			end
 		end
 	end
-	
+
+	function MacLib:LoadAutoLoadConfig()
+		if isStudio or not (isfile and readfile) then return "Config system unavailable." end
+
+		if isfile(MacLib.Folder .. "/settings/autoload.txt") then
+			local name = readfile(MacLib.Folder .. "/settings/autoload.txt")
+
+			local suc, err = MacLib:LoadConfig(name)
+			if not suc then
+				WindowFunctions:Notify({
+					Title = "Interface",
+					Description = "Error loading autoload config: " .. err
+				})
+			end
+
+			WindowFunctions:Notify({
+				Title = "Interface",
+				Description = string.format("Autoloaded config: %q", name),
+			})
+		end
+	end
+
 	function MacLib:SetFolder(Folder)
+		if isStudio then return "Config system unavailable." end
+
 		MacLib.Folder = Folder;
 		BuildFolderTree()
 	end
-	
+
 	function MacLib:SaveConfig(Path)
+		if isStudio or not writefile then return "Config system unavailable." end
+
 		if (not Path) then
 			return false, "Please select a config file."
 		end
@@ -5516,6 +5533,7 @@ function MacLib:Window(Settings)
 		for flag, option in next, MacLib.Options do
 			if not ClassParser[option.Class] then continue end
 			if option.IgnoreConfig then continue end
+
 			table.insert(data.objects, ClassParser[option.Class].Save(flag, option))
 		end	
 
@@ -5527,8 +5545,10 @@ function MacLib:Window(Settings)
 		writefile(fullPath, encoded)
 		return true
 	end
-	
+
 	function MacLib:LoadConfig(Path)
+		if isStudio or not (isfile and readfile) then return "Config system unavailable." end
+
 		if (not Path) then
 			return false, "Please select a config file."
 		end
@@ -5549,9 +5569,11 @@ function MacLib:Window(Settings)
 
 		return true
 	end
-	
+
 	function MacLib:RefreshConfigList()
-		local list = listfiles(MacLib.Folder .. "/settings")
+		if isStudio or not (isfolder and listfiles) then return "Config system unavailable." end
+
+		local list = (isfolder(MacLib.Folder) and isfolder(MacLib.Folder .. "/settings")) and listfiles(MacLib.Folder .. "/settings") or {}
 
 		local out = {}
 		for i = 1, #list do
@@ -5579,12 +5601,12 @@ function MacLib:Window(Settings)
 	end
 
 	macLib.Enabled = false
-	
+
 	local assetList = {}
 	for _, assetId in pairs(assets) do
 		table.insert(assetList, assetId)
 	end
-	
+
 	ContentProvider:PreloadAsync(assetList)
 	macLib.Enabled = true
 	windowState = true
@@ -5856,4 +5878,3 @@ function MacLib:Demo()
 end
 
 return MacLib
-
